@@ -111,7 +111,7 @@ def test(model, test_loader, train_loader, device):
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='PyTorch ResNet Training') 
-    parser.add_argument('--dataset', default='GunPoint', type=str, help='dataset name')
+    parser.add_argument('--dataset', default='names.txt', type=str, help='dataset name')
     parser.add_argument('--train_ratio', default=0.9, type=float, help='train ratio')
     parser.add_argument('--random_state', default=0, type=int, help='random state')
     parser.add_argument('--path', default='./data', type=str, help='path to dataset')
@@ -133,99 +133,105 @@ if __name__ == '__main__':
     test_interval = args.test_interval
     batch_size = args.batch_size
 
-
-    if not Path(save_path).exists():
-        Path(save_path).mkdir(parents=True)
-    csv_file = Path(str(save_path), str(dataset) + '.csv')
-    if csv_file.exists():
-        df = pd.read_csv(csv_file)
+    if dataset == 'names.txt':
+        with open('./names.txt','r') as f:
+            datasets = f.read().splitlines()
     else:
-        df = pd.DataFrame(columns=['ratio', 'random_state', 'accuracy'])
-        df.to_csv(csv_file, index=False)
+        datasets = [dataset]
 
-    for ratio in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9,1]:
-        for random_state in range(3):
-            print(f'dataset:{dataset} ratio: {ratio}, random_state: {random_state}')
-            if ratio == 1 & random_state != 0:
-                continue
-            try:
-                if not df[(df['ratio'] == ratio) & (df['random_state'] == random_state)].empty:
-                    print('Already done')
+    for dataset in datasets:  
+        if not Path(save_path).exists():
+            Path(save_path).mkdir(parents=True)
+        csv_file = Path(str(save_path), str(dataset) + '.csv')
+        if csv_file.exists():
+            df = pd.read_csv(csv_file)
+        else:
+            df = pd.DataFrame(columns=['ratio', 'random_state', 'accuracy'])
+            df.to_csv(csv_file, index=False)
+
+        for ratio in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9,1]:
+            for random_state in range(3):
+                print(f'dataset:{dataset} ratio: {ratio}, random_state: {random_state}')
+                if ratio == 1 & random_state != 0:
                     continue
-                        
-                train_data, train_labels, test_data, test_labels = load_UEA_dataset(dataset, train_ratio=ratio,random_state=random_state, path = path)
-                train_data = np.expand_dims(train_data, axis=1)
-                n_classes = len(np.unique(train_labels))
-                print(f'number of classes: {n_classes}')
-                # split train data into train and validation
-                X_train_ori, y_train_ori = train_data, train_labels
-                test_size = 0.2 if len(X_train_ori) // n_classes >= 10 else n_classes * 2
-                print(f'test_size: {test_size}')
-                sss = StratifiedShuffleSplit(n_splits=10, test_size=test_size, random_state=0)
-                sss.get_n_splits(X_train_ori, y_train_ori)
-                for train_index, test_index in sss.split(X_train_ori, y_train_ori):
-                    train_data, val_data = X_train_ori[train_index,:], X_train_ori[test_index,:]
-                    train_labels, val_labels = y_train_ori[train_index], y_train_ori[test_index]
-                print(f'train shape: {np.shape(train_data)}')
-                print(f'val shape: {np.shape(val_data)}')
-                if (np.shape(train_data)[0] // n_classes) < 2 or (np.shape(val_data)[0] // n_classes) < 2:
-                    print('Not enough data')
-                    break
-                test_data = np.expand_dims(test_data, axis=1)
-                train_dataset = TripletDataset(train_data, train_labels, test_data, test_labels)
-                val_dataset = TripletDataset(val_data, val_labels, test_data, test_labels)
-                test_dataset = TripletDataset(test_data, test_labels, test_data, test_labels)
-                train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
-                val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True, num_workers=2)
-                test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=4)
-                model = ResNet()
-                # move to GPU
-                model.to(device)
-                
-                ## train model
-                loss = nn.TripletMarginLoss(margin=1.0, p=2)
-                optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-                mod = 'train'
-                best_model = None
-                best_loss = 100000
-                losses = []
-                print('Start training')
-                print('Initialize test')
-                # test(model, test_loader, train_loader, device)
-                for epoch in range(epochs):
-                    model.train()
-                    for i, (data,_) in enumerate(train_loader):
-                        anchor, positive, negative= data
-                        anchor, positive, negative = anchor.to(device), positive.to(device), negative.to(device)
-                        optimizer.zero_grad()
-                        anchor = anchor.float()
-                        positive = positive.float()
-                        negative = negative.float()
-                        anchor = model(anchor)
-                        positive = model(positive)
-                        negative = model(negative)
-                        triplet_loss = loss(anchor, positive, negative)
-                        triplet_loss.backward()
-                        optimizer.step()
-                    print(f'epoch {epoch} loss {triplet_loss}')
-                    if epoch % test_interval == 0 or epoch == epochs - 1:
-                        test_loss, test_acc = validate(model, val_loader, loss, device)
-                        if test_loss < best_loss:
-                            best_loss = test_loss
-                            best_model = model
-                            # torch.save(best_model.state_dict(), 'best_model.pt')
-                            print('best model changed')
-                        losses.append(test_loss)
-                        if len(losses) > 3 and losses[-1] > losses[-2] > losses[-3]:
-                            print('Early stopping')
-                            break
-                print('Start testing')
-                accuracy = test(best_model, test_loader, train_loader, device)
-                with open(csv_file, 'a') as f:
-                    f.write(f'{ratio},{random_state},{accuracy}\n')
+                try:
+                    if not df[(df['ratio'] == ratio) & (df['random_state'] == random_state)].empty:
+                        print('Already done')
+                        continue
+                            
+                    train_data, train_labels, test_data, test_labels = load_UEA_dataset(dataset, train_ratio=ratio,random_state=random_state, path = path)
+                    train_data = np.expand_dims(train_data, axis=1)
+                    n_classes = len(np.unique(train_labels))
+                    print(f'number of classes: {n_classes}')
+                    # split train data into train and validation
+                    X_train_ori, y_train_ori = train_data, train_labels
+                    test_size = 0.2 if len(X_train_ori) // n_classes >= 10 else n_classes * 2
+                    print(f'test_size: {test_size}')
+                    sss = StratifiedShuffleSplit(n_splits=10, test_size=test_size, random_state=0)
+                    sss.get_n_splits(X_train_ori, y_train_ori)
+                    for train_index, test_index in sss.split(X_train_ori, y_train_ori):
+                        train_data, val_data = X_train_ori[train_index,:], X_train_ori[test_index,:]
+                        train_labels, val_labels = y_train_ori[train_index], y_train_ori[test_index]
+                    print(f'train shape: {np.shape(train_data)}')
+                    print(f'val shape: {np.shape(val_data)}')
+                    if (np.shape(train_data)[0] // n_classes) < 2 or (np.shape(val_data)[0] // n_classes) < 2:
+                        print('Not enough data')
+                        break
+                    test_data = np.expand_dims(test_data, axis=1)
+                    train_dataset = TripletDataset(train_data, train_labels, test_data, test_labels)
+                    val_dataset = TripletDataset(val_data, val_labels, test_data, test_labels)
+                    test_dataset = TripletDataset(test_data, test_labels, test_data, test_labels)
+                    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
+                    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True, num_workers=2)
+                    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=4)
+                    model = ResNet()
+                    # move to GPU
+                    model.to(device)
+                    
+                    ## train model
+                    loss = nn.TripletMarginLoss(margin=1.0, p=2)
+                    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+                    mod = 'train'
+                    best_model = None
+                    best_loss = 100000
+                    losses = []
+                    print('Start training')
+                    print('Initialize test')
+                    # test(model, test_loader, train_loader, device)
+                    for epoch in range(epochs):
+                        model.train()
+                        for i, (data,_) in enumerate(train_loader):
+                            anchor, positive, negative= data
+                            anchor, positive, negative = anchor.to(device), positive.to(device), negative.to(device)
+                            optimizer.zero_grad()
+                            anchor = anchor.float()
+                            positive = positive.float()
+                            negative = negative.float()
+                            anchor = model(anchor)
+                            positive = model(positive)
+                            negative = model(negative)
+                            triplet_loss = loss(anchor, positive, negative)
+                            triplet_loss.backward()
+                            optimizer.step()
+                        print(f'epoch {epoch} loss {triplet_loss}')
+                        if epoch % test_interval == 0 or epoch == epochs - 1:
+                            test_loss, test_acc = validate(model, val_loader, loss, device)
+                            if test_loss < best_loss:
+                                best_loss = test_loss
+                                best_model = model
+                                # torch.save(best_model.state_dict(), 'best_model.pt')
+                                print('best model changed')
+                            losses.append(test_loss)
+                            if len(losses) > 3 and losses[-1] > losses[-2] > losses[-3]:
+                                print('Early stopping')
+                                break
+                    print('Start testing')
+                    accuracy = test(best_model, test_loader, train_loader, device)
+                    with open(csv_file, 'a') as f:
+                        f.write(f'{ratio},{random_state},{accuracy}\n')
 
 
-            except Exception as e:
-                print('ratio {} random_state {} failed'.format(ratio, random_state))
-                print(e)
-                continue
+                except Exception as e:
+                    print('ratio {} random_state {} failed'.format(ratio, random_state))
+                    print(e)
+                    continue
