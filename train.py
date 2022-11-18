@@ -10,6 +10,7 @@ from triplet_dataset import TripletDataset
 from resnet import ResNet
 import torch
 import torch.nn as nn
+import os
 
 def load_UEA_dataset(dataset, train_ratio=0.9,random_state=0, path = None):
     """
@@ -119,9 +120,12 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', default=2000, type=int, help='epochs')
     parser.add_argument('--lr', default=0.00001, type=float, help='learning rate')
     parser.add_argument('--test_interval', default=10, type=int, help='test interval')
+    parser.add_argument('--gpu', default='0', type=str, help='gpu id')
 
     args = parser.parse_args()
 
+    os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+    os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
 
     path = Path(args.path)
     save_path = Path('./results')
