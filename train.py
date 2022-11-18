@@ -134,8 +134,8 @@ if __name__ == '__main__':
     test_interval = args.test_interval
     batch_size = args.batch_size
 
-    if dataset == 'names.txt':
-        with open('./names.txt','r') as f:
+    if '.txt' in dataset:
+        with open(dataset,'r') as f:
             datasets = f.read().splitlines()
     else:
         datasets = [dataset]

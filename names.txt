@@ -11,12 +11,3 @@ GunPointMaleVersusFemale
 GunPointOldVersusYoung
 ItalyPowerDemand
 MoteStrain
-Plane
-SmoothSubspace
-SonyAIBORobotSurface1
-SonyAIBORobotSurface2
-SyntheticControl
-ToeSegmentation1
-TwoLeadECG
-UMD
-Wine
