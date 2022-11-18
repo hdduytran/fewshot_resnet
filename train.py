@@ -258,7 +258,7 @@ if __name__ == '__main__':
 
                             losses.append(test_loss)
 
-                            if len(losses) > 3 and losses[-1] > losses[-2] > losses[-3]:
+                            if len(losses) > 3 and losses[-1] >= losses[-2] >= losses[-3]:
                                 print('Early stopping')
                                 break
 
