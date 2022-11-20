@@ -158,7 +158,7 @@ if __name__ == '__main__':
             df.to_csv(csv_file, index=False)
 
         for ratio in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9,1]:
-            for random_state in range(3):
+            for random_state in range(10):
 
                 print(f'dataset:{dataset} ratio: {ratio}, random_state: {random_state}')
 
