@@ -192,7 +192,12 @@ if __name__ == '__main__':
                         train_data, val_data = X_train_ori[train_index,:], X_train_ori[test_index,:]
                         train_labels, val_labels = y_train_ori[train_index], y_train_ori[test_index]
 
+                    
                     print(f'train shape: {np.shape(train_data)}')
+                    print(f'train labels: {train_labels}')
+                    if np.any(np.bincount(train_labels) < 2):
+                        print('train labels are not continuous')
+                        continue
                     print(f'val shape: {np.shape(val_data)}')
                     print(f'val labels: {val_labels}')
 
